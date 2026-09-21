@@ -1,4 +1,4 @@
-# TT Interview — ONS local authorities
+# TT Interview
 
 A starter web app for a technical interview:
 
