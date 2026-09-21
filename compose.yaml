@@ -1,0 +1,56 @@
+name: tt-interview
+
+x-python: &python
+  build: ./backend
+  environment:
+    DATABASE_URL: postgresql://interview:interview@db:5432/interview
+  volumes:
+    - ./backend:/app
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: interview
+      POSTGRES_PASSWORD: interview
+      POSTGRES_DB: interview
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U interview -d interview']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  pipeline:
+    <<: *python
+    command: [python, -m, pipeline]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *python
+    command: [gunicorn, --bind, '0.0.0.0:5000', --reload, 'app:create_app()']
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: ./frontend
+    ports:
+      - '127.0.0.1:${WEB_PORT:-8088}:5173'
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
